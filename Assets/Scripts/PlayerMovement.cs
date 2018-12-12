@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class PlayerMovement : MonoBehaviour {
+public class PlayerMovement : MonoBehaviour
+{
 
     //horizontal movement variables
     public float storedLastInput;
@@ -31,10 +32,12 @@ public class PlayerMovement : MonoBehaviour {
 
     public bool clingingToWall;
     public float clingBufferStart;
+    public bool bufferedCling;
 
     public bool jumpInputted;
     public bool leftInputted;
     public bool rightInputted;
+    public bool jetpackInput;
 
     // Use this for initialization
     void Start()
@@ -44,7 +47,7 @@ public class PlayerMovement : MonoBehaviour {
         bc = GetComponent<BoxCollider2D>();
 
         //use motion equations to get gravity and jump velocity
-        gravityValue = (terminalVelocity/0.3333f);
+        gravityValue = (terminalVelocity / 0.3333f);
         jumpVelocity = -(gravityValue * jumpTime);
     }
 
@@ -63,16 +66,23 @@ public class PlayerMovement : MonoBehaviour {
         {
             jumpInputted = false;
 
-            if((totalVelocity * Input.GetAxis("Horizontal") > 0 && leftInputted != true) || (totalVelocity * Input.GetAxis("Horizontal") < 0 && rightInputted != true))
+            if ((totalVelocity * Input.GetAxis("Horizontal") > 0 && leftInputted != true) && bufferedCling == false || (totalVelocity * Input.GetAxis("Horizontal") < 0 && rightInputted != true) && bufferedCling == false)
             {
-                totalVelocity = -totalVelocity * 6;
-                prevVelocity = -prevVelocity * 6;
+                totalVelocity = -totalVelocity * 5;
+                prevVelocity = -prevVelocity * 5;
             }
-            else if((totalVelocity * Input.GetAxis("Horizontal") > 0 && leftInputted == true) || (totalVelocity * Input.GetAxis("Horizontal") < 0 && rightInputted == true))
+            else if ((totalVelocity * Input.GetAxis("Horizontal") > 0 && leftInputted == true))
             {
-                storedLastInput = -storedLastInput;
+                storedLastInput = -1;
+            }
+            else if ((totalVelocity * Input.GetAxis("Horizontal") < 0 && rightInputted == true))
+            {
+                storedLastInput = 1;
             }
             rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y + jumpVelocity);
+            bufferedCling = false;
+            clingingToWall = false;
+            clingBufferStart = 0;
         }
     }
 
@@ -81,7 +91,7 @@ public class PlayerMovement : MonoBehaviour {
     {
         //if the either of the input axis are receiving RAW input, start running some acceleration calculations (GetAxisRaw only returns 0,1,-1 based on what input is pressed)
         if (leftInputted == true || rightInputted == true)
-        {          
+        {
 
             storedLastInput = Input.GetAxisRaw("Horizontal");//store the input values in a vector2 for deceleration
 
@@ -95,7 +105,7 @@ public class PlayerMovement : MonoBehaviour {
             {
                 totalVelocity = MaxSpeed;//set the velocity to the max speed
             }
-            
+
             //totalStart++; //this is for testing
         }
 
@@ -130,9 +140,6 @@ public class PlayerMovement : MonoBehaviour {
             totalVelocity = 0;//set the total velocity back to 0 to fix that
             //print("Deceleration time in frames: " + totalEnd);
         }
-
-        //call the translate command for the x axis using vector3.right (storedLastInput provides input vector2 values that can never be 0,0)
-        //rb.velocity = new Vector2((storedLastInput * displacement), rb.velocity.y);
 
         //set the previous velocity to the current total velocity for the next loop around with this function
         prevVelocity = totalVelocity;
@@ -171,20 +178,39 @@ public class PlayerMovement : MonoBehaviour {
 
     void CheckWallCling()
     {
-        if(grounded == false && rb.velocity.x == 0 && (totalVelocity * storedLastInput == 180 || totalVelocity * storedLastInput == -180))
+        Debug.DrawRay(new Vector2((bc.offset.x + bc.bounds.center.x) - (bc.bounds.extents.x + 0.1f), rb.position.y), Vector2.right * (bc.bounds.extents.x * 2 + 0.2f));
+
+        foreach(RaycastHit2D b in Physics2D.RaycastAll(new Vector2((bc.offset.x + bc.bounds.center.x) - (bc.bounds.extents.x + 0.1f), rb.position.y), Vector2.right, (bc.bounds.extents.x * 2 + 0.2f)))
+        if (grounded == false && rb.velocity.x == 0 && (totalVelocity * storedLastInput == 180 || totalVelocity * storedLastInput == -180) && (Physics2D.Raycast(new Vector2((bc.offset.x + bc.bounds.center.x) - (bc.bounds.extents.x + 0.2f), rb.position.y), Vector2.right, 0.1f) || Physics2D.Raycast(new Vector2((bc.offset.x + bc.bounds.center.x) + (bc.bounds.extents.x + 0.2f), rb.position.y), Vector2.left, 0.1f)))
         {
+            bufferedCling = false;
             clingingToWall = true;
             rb.velocity = new Vector2(0, rb.velocity.y - (gravityValue * Time.deltaTime));
             clingBufferStart = Time.time;
         }
-        else if(clingBufferStart + 0.2 < Time.time)
+        else if (clingBufferStart + 0.2 > Time.time)
         {
+            bufferedCling = true;
+        }
+        else if (clingBufferStart + 0.2 <= Time.time)
+        {
+            bufferedCling = false;
             clingingToWall = false;
+        }
+
+    }
+
+    void JetpackHover()
+    {
+        if (jetpackInput == true)
+        {
+            jetpackInput = false;
+            //rb.velocity = 
         }
     }
 
     private void Update()
-    {       
+    {
         if (Input.GetButtonDown("Jump") == true)
         {
             jumpInputted = true;
@@ -200,9 +226,15 @@ public class PlayerMovement : MonoBehaviour {
             rightInputted = true;
         }
 
+        if (Input.GetButton("Fire3") == true)
+        {
+            jetpackInput = true;
+        }
+
     }
 
-    void FixedUpdate () {
+    void FixedUpdate()
+    {
 
         CheckGrounded();
 
@@ -215,7 +247,7 @@ public class PlayerMovement : MonoBehaviour {
         JumpCall();
 
         //apply gravity to shovel knight
-        rb.velocity = new Vector2((totalVelocity * storedLastInput), rb.velocity.y + (gravityValue * Time.deltaTime));        
+        rb.velocity = new Vector2((totalVelocity * storedLastInput), rb.velocity.y + (gravityValue * Time.deltaTime));
 
         //if the player is not grounded
         if (grounded == false)
