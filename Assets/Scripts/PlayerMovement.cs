@@ -30,6 +30,7 @@ public class PlayerMovement : MonoBehaviour {
     public BoxCollider2D bc;
 
     public bool clingingToWall;
+    public float clingBufferStart;
 
     public bool jumpInputted;
     public bool leftInputted;
@@ -61,8 +62,16 @@ public class PlayerMovement : MonoBehaviour {
         if (jumpInputted == true && clingingToWall == true)
         {
             jumpInputted = false;
-            totalVelocity = -totalVelocity * 6;
-            prevVelocity = -prevVelocity * 6;
+
+            if((totalVelocity * Input.GetAxis("Horizontal") > 0 && leftInputted != true) || (totalVelocity * Input.GetAxis("Horizontal") < 0 && rightInputted != true))
+            {
+                totalVelocity = -totalVelocity * 6;
+                prevVelocity = -prevVelocity * 6;
+            }
+            else if((totalVelocity * Input.GetAxis("Horizontal") > 0 && leftInputted == true) || (totalVelocity * Input.GetAxis("Horizontal") < 0 && rightInputted == true))
+            {
+                storedLastInput = -storedLastInput;
+            }
             rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y + jumpVelocity);
         }
     }
@@ -166,8 +175,9 @@ public class PlayerMovement : MonoBehaviour {
         {
             clingingToWall = true;
             rb.velocity = new Vector2(0, rb.velocity.y - (gravityValue * Time.deltaTime));
+            clingBufferStart = Time.time;
         }
-        else
+        else if(clingBufferStart + 0.2 < Time.time)
         {
             clingingToWall = false;
         }
@@ -201,7 +211,6 @@ public class PlayerMovement : MonoBehaviour {
 
         CheckWallCling();
 
-
         //check the jump
         JumpCall();
 
@@ -215,6 +224,8 @@ public class PlayerMovement : MonoBehaviour {
             Mathf.Clamp(rb.velocity.y, terminalVelocity, jumpVelocity);
         }
 
+        leftInputted = false;
+        rightInputted = false;
     }
 }
 
