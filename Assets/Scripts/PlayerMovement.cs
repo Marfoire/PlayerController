@@ -57,14 +57,12 @@ public class PlayerMovement : MonoBehaviour
         //if the player is grounded and they press jump
         if (jumpInputted == true && grounded == true)
         {
-            jumpInputted = false;
             //apply the initial jump velocity
             rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y + jumpVelocity);
             //rb.MovePosition(new Vector2(rb.position.x, rb.position.y + jumpVelocity));
         }
         if (jumpInputted == true && clingingToWall == true)
         {
-            jumpInputted = false;
 
             if ((totalVelocity * Input.GetAxis("Horizontal") > 0 && leftInputted != true) && bufferedCling == false || (totalVelocity * Input.GetAxis("Horizontal") < 0 && rightInputted != true) && bufferedCling == false)
             {
@@ -149,9 +147,9 @@ public class PlayerMovement : MonoBehaviour
     void CheckGrounded()
     {
         //create a ray that's just below the player's character
-        hit = Physics2D.Raycast(new Vector2(bc.offset.x + 0.1f + bc.bounds.center.x - (bc.bounds.extents.x), rb.position.y - (bc.bounds.extents.y + 0.1f)), Vector2.right, bc.bounds.extents.x * 2 - 0.1f);
+        hit = Physics2D.Raycast(new Vector2(0.1f + bc.bounds.center.x - (bc.bounds.extents.x), rb.position.y - (bc.bounds.extents.y + 0.1f)), Vector2.right, bc.bounds.extents.x * 2 - 0.1f);
 
-        Debug.DrawRay(new Vector2(bc.offset.x + 0.1f + bc.bounds.center.x - (bc.bounds.extents.x), rb.position.y - (bc.bounds.extents.y + 0.1f)), Vector2.right * (bc.bounds.extents.x * 2 - 0.1f), Color.white);
+        Debug.DrawRay(new Vector2(0.1f + bc.bounds.center.x - (bc.bounds.extents.x), rb.position.y - (bc.bounds.extents.y + 0.1f)), Vector2.right * (bc.bounds.extents.x * 2 - 0.1f), Color.white);
 
         if (hit.collider != null)
         {//if the ray collider with something
@@ -178,10 +176,10 @@ public class PlayerMovement : MonoBehaviour
 
     void CheckWallCling()
     {
-        Debug.DrawRay(new Vector2((bc.offset.x + bc.bounds.center.x) - (bc.bounds.extents.x + 0.1f), rb.position.y), Vector2.right * (bc.bounds.extents.x * 2 + 0.2f));
+        Debug.DrawRay(new Vector2((bc.bounds.center.x) - (bc.bounds.extents.x + 0.1f), bc.bounds.center.y - (bc.bounds.extents.y - 0.1f)), Vector2.up * ((bc.bounds.extents.y * 2 - 0.1f)), Color.yellow);
+        Debug.DrawRay(new Vector2((bc.bounds.center.x) + (bc.bounds.extents.x + 0.1f), bc.bounds.center.y - (bc.bounds.extents.y - 0.1f)), Vector2.up * ((bc.bounds.extents.y * 2 - 0.1f)), Color.yellow);
 
-        foreach(RaycastHit2D b in Physics2D.RaycastAll(new Vector2((bc.offset.x + bc.bounds.center.x) - (bc.bounds.extents.x + 0.1f), rb.position.y), Vector2.right, (bc.bounds.extents.x * 2 + 0.2f)))
-        if (grounded == false && rb.velocity.x == 0 && (totalVelocity * storedLastInput == 180 || totalVelocity * storedLastInput == -180) && (Physics2D.Raycast(new Vector2((bc.offset.x + bc.bounds.center.x) - (bc.bounds.extents.x + 0.2f), rb.position.y), Vector2.right, 0.1f) || Physics2D.Raycast(new Vector2((bc.offset.x + bc.bounds.center.x) + (bc.bounds.extents.x + 0.2f), rb.position.y), Vector2.left, 0.1f)))
+        if (grounded == false && rb.velocity.x == 0 && (totalVelocity * storedLastInput == 180 || totalVelocity * storedLastInput == -180) && (Physics2D.Raycast(new Vector2((bc.bounds.center.x) - (bc.bounds.extents.x + 0.1f), bc.bounds.center.y - (bc.bounds.extents.y - 0.1f)), Vector2.up, ((bc.bounds.extents.y * 2 - 0.1f))) || Physics2D.Raycast(new Vector2((bc.bounds.center.x) + (bc.bounds.extents.x + 0.1f), bc.bounds.center.y - (bc.bounds.extents.y - 0.1f)), Vector2.up * (bc.bounds.extents.y * 2 - 0.1f))))
         {
             bufferedCling = false;
             clingingToWall = true;
@@ -204,8 +202,7 @@ public class PlayerMovement : MonoBehaviour
     {
         if (jetpackInput == true)
         {
-            jetpackInput = false;
-            //rb.velocity = 
+            rb.velocity = new Vector2((totalVelocity * storedLastInput), Mathf.Clamp(rb.velocity.y + (jumpVelocity / 0.2f * Time.deltaTime) - (gravityValue * Time.deltaTime), terminalVelocity, -(gravityValue * Time.deltaTime)));
         }
     }
 
@@ -246,11 +243,13 @@ public class PlayerMovement : MonoBehaviour
         //check the jump
         JumpCall();
 
+        JetpackHover();
+
         //apply gravity to shovel knight
         rb.velocity = new Vector2((totalVelocity * storedLastInput), rb.velocity.y + (gravityValue * Time.deltaTime));
 
         //if the player is not grounded
-        if (grounded == false)
+        if (grounded == false && jetpackInput == false)
         {
             //clamp the velocity between the terminal velocity and the intial velocity
             Mathf.Clamp(rb.velocity.y, terminalVelocity, jumpVelocity);
@@ -258,6 +257,8 @@ public class PlayerMovement : MonoBehaviour
 
         leftInputted = false;
         rightInputted = false;
+        jumpInputted = false;
+        jetpackInput = false;
     }
 }
 
