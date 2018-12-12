@@ -38,6 +38,19 @@ public class PlayerMovement : MonoBehaviour
     public bool leftInputted;
     public bool rightInputted;
     public bool jetpackInput;
+    public bool jetpackUsed;
+
+    //take this
+    public bool isJumping;
+    float early;
+    float late;
+    public bool latePass;
+    public bool lateGate;
+    bool doubleJump;
+    RaycastHit2D leftWallCheck;
+    RaycastHit2D rightWallCheck;
+
+
 
     // Use this for initialization
     void Start()
@@ -54,13 +67,46 @@ public class PlayerMovement : MonoBehaviour
     //method for jumping
     void JumpCall()
     {
-        //if the player is grounded and they press jump
-        if (jumpInputted == true && grounded == true)
+
+        if (isJumping && jumpInputted && clingingToWall == false)
         {
+            if(jetpackInput == true)
+            {
+                jetpackInput = false;
+                jetpackUsed = true;
+            }
+            rb.velocity = Vector2.zero;
+            isJumping = false;
+            rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y + jumpVelocity);
+            doubleJump = true;
+        }
+
+        //if the player is grounded and they press jump
+        if ((jumpInputted == true && grounded == true) || (Time.time - early <= 0.15F && grounded == true /*early jump condition*/ || latePass == true /*late jump condition*/))
+        {
+
+
+
+
+            if (jumpInputted == true && grounded == true)
+            {
+                isJumping = true;
+            }
+
+
+
+            if (latePass)
+            {
+                latePass = false;
+                rb.velocity = Vector2.zero;
+            }
+
             //apply the initial jump velocity
             rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y + jumpVelocity);
             //rb.MovePosition(new Vector2(rb.position.x, rb.position.y + jumpVelocity));
         }
+
+
         if (jumpInputted == true && clingingToWall == true)
         {
 
@@ -78,6 +124,7 @@ public class PlayerMovement : MonoBehaviour
                 storedLastInput = 1;
             }
             rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y + jumpVelocity);
+            isJumping = true;
             bufferedCling = false;
             clingingToWall = false;
             clingBufferStart = 0;
@@ -147,9 +194,9 @@ public class PlayerMovement : MonoBehaviour
     void CheckGrounded()
     {
         //create a ray that's just below the player's character
-        hit = Physics2D.Raycast(new Vector2(0.1f + bc.bounds.center.x - (bc.bounds.extents.x), rb.position.y - (bc.bounds.extents.y + 0.1f)), Vector2.right, bc.bounds.extents.x * 2 - 0.1f);
+        
 
-        Debug.DrawRay(new Vector2(0.1f + bc.bounds.center.x - (bc.bounds.extents.x), rb.position.y - (bc.bounds.extents.y + 0.1f)), Vector2.right * (bc.bounds.extents.x * 2 - 0.1f), Color.white);
+        
 
         if (hit.collider != null)
         {//if the ray collider with something
@@ -164,6 +211,11 @@ public class PlayerMovement : MonoBehaviour
             {
                 grounded = true;//set grounded to true
 
+                lateGate = false;
+                doubleJump = false;
+                isJumping = false;
+                jetpackInput = false;
+                jetpackUsed = false;
             }
 
 
@@ -171,19 +223,26 @@ public class PlayerMovement : MonoBehaviour
         else//if there are no collisions
         {
             grounded = false;//set grounded to false
+
+            if (lateGate == false && isJumping == false && doubleJump == false && jumpInputted == false)
+            {
+                late = Time.time;
+                lateGate = true;
+            }
+
         }
     }
 
     void CheckWallCling()
     {
-        Debug.DrawRay(new Vector2((bc.bounds.center.x) - (bc.bounds.extents.x + 0.1f), bc.bounds.center.y - (bc.bounds.extents.y - 0.1f)), Vector2.up * ((bc.bounds.extents.y * 2 - 0.1f)), Color.yellow);
-        Debug.DrawRay(new Vector2((bc.bounds.center.x) + (bc.bounds.extents.x + 0.1f), bc.bounds.center.y - (bc.bounds.extents.y - 0.1f)), Vector2.up * ((bc.bounds.extents.y * 2 - 0.1f)), Color.yellow);
+        
 
-        if (grounded == false && rb.velocity.x == 0 && (totalVelocity * storedLastInput == 180 || totalVelocity * storedLastInput == -180) && (Physics2D.Raycast(new Vector2((bc.bounds.center.x) - (bc.bounds.extents.x + 0.1f), bc.bounds.center.y - (bc.bounds.extents.y - 0.1f)), Vector2.up, ((bc.bounds.extents.y * 2 - 0.1f))) || Physics2D.Raycast(new Vector2((bc.bounds.center.x) + (bc.bounds.extents.x + 0.1f), bc.bounds.center.y - (bc.bounds.extents.y - 0.1f)), Vector2.up * (bc.bounds.extents.y * 2 - 0.1f))))
+        if (grounded == false && rb.velocity.x == 0 && (totalVelocity * storedLastInput == 180 || totalVelocity * storedLastInput == -180) && (rightWallCheck || leftWallCheck))
         {
             bufferedCling = false;
             clingingToWall = true;
-            rb.velocity = new Vector2(0, rb.velocity.y - (gravityValue * Time.deltaTime));
+            jetpackUsed = false;
+            rb.velocity = new Vector2(0, Mathf.Clamp(rb.velocity.y - (gravityValue * 60 * Time.deltaTime), terminalVelocity, 0));
             clingBufferStart = Time.time;
         }
         else if (clingBufferStart + 0.2 > Time.time)
@@ -200,8 +259,9 @@ public class PlayerMovement : MonoBehaviour
 
     void JetpackHover()
     {
-        if (jetpackInput == true)
+        if (jetpackInput == true && jetpackUsed == false)
         {
+            
             rb.velocity = new Vector2((totalVelocity * storedLastInput), Mathf.Clamp(rb.velocity.y + (jumpVelocity / 0.2f * Time.deltaTime) - (gravityValue * Time.deltaTime), terminalVelocity, -(gravityValue * Time.deltaTime)));
         }
     }
@@ -210,6 +270,16 @@ public class PlayerMovement : MonoBehaviour
     {
         if (Input.GetButtonDown("Jump") == true)
         {
+            if (Time.time - late <= 0.05F && lateGate == true)
+            {
+                latePass = true;
+            }
+
+            if (grounded == false && doubleJump == true)
+            {
+                early = Time.time;
+            }
+
             jumpInputted = true;
         }
 
@@ -228,6 +298,25 @@ public class PlayerMovement : MonoBehaviour
             jetpackInput = true;
         }
 
+        if(Input.GetButtonUp("Fire3") == true && jetpackInput == true)
+        {
+            jetpackInput = false;
+            jetpackUsed = true;
+        }
+
+        Debug.DrawRay(new Vector2(0.1f + bc.bounds.center.x - (bc.bounds.extents.x), rb.position.y - (bc.bounds.extents.y + 0.1f)), Vector2.right * (bc.bounds.extents.x * 2 - 0.1f), Color.white);
+
+        hit = Physics2D.Raycast(new Vector2(0.1f + bc.bounds.center.x - (bc.bounds.extents.x), rb.position.y - (bc.bounds.extents.y + 0.1f)), Vector2.right, bc.bounds.extents.x * 2 - 0.1f);
+
+
+        Debug.DrawRay(new Vector2((rb.position.x) - (bc.bounds.extents.x + 0.1f), rb.position.y - (bc.bounds.extents.y - 0.1f)), Vector2.up * ((bc.bounds.extents.y * 2 - 0.1f)), Color.yellow);
+        Debug.DrawRay(new Vector2((rb.position.x) + (bc.bounds.extents.x + 0.1f), rb.position.y - (bc.bounds.extents.y - 0.1f)), Vector2.up * ((bc.bounds.extents.y * 2 - 0.1f)), Color.yellow);
+
+        leftWallCheck = Physics2D.Raycast(new Vector2((bc.bounds.center.x) - (bc.bounds.extents.x + 0.1f), bc.bounds.center.y - (bc.bounds.extents.y - 0.1f)), Vector2.up, (bc.bounds.extents.y * 2 - 0.1f));
+        rightWallCheck = Physics2D.Raycast(new Vector2((bc.bounds.center.x) + (bc.bounds.extents.x + 0.1f), bc.bounds.center.y - (bc.bounds.extents.y - 0.1f)), Vector2.up, (bc.bounds.extents.y * 2 - 0.1f));
+
+
+
     }
 
     void FixedUpdate()
@@ -235,10 +324,10 @@ public class PlayerMovement : MonoBehaviour
 
         CheckGrounded();
 
+        CheckWallCling();
+
         //call horizontal movement
         HorizontalMovement();
-
-        CheckWallCling();
 
         //check the jump
         JumpCall();
